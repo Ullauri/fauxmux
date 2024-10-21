@@ -42,12 +42,17 @@ func (fm *Mux) Routes() []string {
 // RegisterEndpoint registers a new endpoint with a specific configuration for a given response type
 func RegisterEndpoint[T any](fm *Mux, endpointCfg EndpointConfig) error {
 	if err := endpointCfg.Validate(); err != nil {
-		return err
+		return fmt.Errorf("failed to register endpoint: %v", err)
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		latency := time.Duration(rand.Intn(int(endpointCfg.MaxLatency-endpointCfg.MinLatency))) + endpointCfg.MinLatency
 		time.Sleep(latency)
+
+		if shouldTriggerError(endpointCfg.ErrorResponseConfig) {
+			handleErrorResponse(w, endpointCfg)
+			return
+		}
 
 		var response interface{}
 		var err error
