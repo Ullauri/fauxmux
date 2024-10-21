@@ -177,7 +177,10 @@ func getResponseData[T any](endpointCfg EndpointConfig) (*T, error) {
 }
 
 func getListResponseData[T any](endpointCfg EndpointConfig) ([]T, error) {
-	responseLen := rand.Intn(endpointCfg.ListResponseConfig.MaxItems-endpointCfg.ListResponseConfig.MinItems) + endpointCfg.ListResponseConfig.MinItems
+	responseLen := endpointCfg.ListResponseConfig.MinItems
+	if endpointCfg.ListResponseConfig.MaxItems > endpointCfg.ListResponseConfig.MinItems {
+		responseLen = rand.Intn(endpointCfg.ListResponseConfig.MaxItems-endpointCfg.ListResponseConfig.MinItems+1) + endpointCfg.ListResponseConfig.MinItems
+	}
 	response := make([]T, 0, responseLen)
 
 	fakeDataFunc := getFakeDataFunc(endpointCfg)

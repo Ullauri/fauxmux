@@ -56,7 +56,7 @@ func RegisterEndpoint[T any](fm *Mux, endpointCfg EndpointConfig) error {
 
 		var response interface{}
 		var err error
-		if endpointCfg.ListResponseConfig.MinItems > 0 {
+		if endpointCfg.ListResponseConfig != nil {
 			response, err = getListResponseData[T](endpointCfg)
 		} else {
 			response, err = getResponseData[T](endpointCfg)
