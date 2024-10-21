@@ -3,6 +3,7 @@ package fauxmux
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"slices"
 	"time"
@@ -16,13 +17,37 @@ const (
 	JSON ResponseFormat = "json"
 )
 
+type ListResponseConfig struct {
+	MinItems int
+	MaxItems int
+}
+
+func (l ListResponseConfig) Validate() error {
+	if l.MinItems != 0 || l.MaxItems != 0 {
+		if l.MinItems < 0 {
+			return fmt.Errorf("min items cannot be negative")
+		}
+
+		if l.MaxItems < 0 {
+			return fmt.Errorf("max items cannot be negative")
+		}
+
+		if l.MaxItems < l.MinItems {
+			return fmt.Errorf("max items cannot be less than min items")
+		}
+	}
+
+	return nil
+}
+
 type EndpointConfig struct {
-	Method         string
-	Path           string
-	MinLatency     time.Duration
-	MaxLatency     time.Duration
-	FakeDataFunc   FakeDataFunc
-	ResponseFormat string
+	Method             string
+	Path               string
+	MinLatency         time.Duration
+	MaxLatency         time.Duration
+	FakeDataFunc       FakeDataFunc
+	ResponseFormat     string
+	ListResponseConfig ListResponseConfig
 }
 
 func (e EndpointConfig) Validate() error {
@@ -50,25 +75,44 @@ func (e EndpointConfig) Validate() error {
 		return fmt.Errorf("invalid response format")
 	}
 
+	if err := e.ListResponseConfig.Validate(); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func getFakeDataFunc(endpointCfg EndpointConfig) FakeDataFunc {
+	if endpointCfg.FakeDataFunc != nil {
+		return endpointCfg.FakeDataFunc
+	}
+	return config.FakeDataFunc
 }
 
 func getResponseData[T any](endpointCfg EndpointConfig) (*T, error) {
 	var response T
+	err := getFakeDataFunc(endpointCfg)(&response)
+	if err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
 
-	if endpointCfg.FakeDataFunc != nil {
-		err := endpointCfg.FakeDataFunc(&response)
+func getListResponseData[T any](endpointCfg EndpointConfig) ([]T, error) {
+	responseLen := rand.Intn(endpointCfg.ListResponseConfig.MaxItems-endpointCfg.ListResponseConfig.MinItems) + endpointCfg.ListResponseConfig.MinItems
+	response := make([]T, 0, responseLen)
+
+	fakeDataFunc := getFakeDataFunc(endpointCfg)
+	for i := 0; i < responseLen; i++ {
+		var item T
+		err := fakeDataFunc(&item)
 		if err != nil {
-			return nil, fmt.Errorf("internal Server Error: %v", err)
+			return nil, err
 		}
-	} else {
-		err := config.FakeDataFunc(&response)
-		if err != nil {
-			return nil, fmt.Errorf("internal Server Error: %v", err)
-		}
+		response = append(response, item)
 	}
 
-	return &response, nil
+	return response, nil
 }
 
 func writeJSON(w http.ResponseWriter, data interface{}) {

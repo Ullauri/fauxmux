@@ -49,7 +49,13 @@ func RegisterEndpoint[T any](fm *Mux, endpointCfg EndpointConfig) error {
 		latency := time.Duration(rand.Intn(int(endpointCfg.MaxLatency-endpointCfg.MinLatency))) + endpointCfg.MinLatency
 		time.Sleep(latency)
 
-		response, err := getResponseData[T](endpointCfg)
+		var response interface{}
+		var err error
+		if endpointCfg.ListResponseConfig.MinItems > 0 {
+			response, err = getListResponseData[T](endpointCfg)
+		} else {
+			response, err = getResponseData[T](endpointCfg)
+		}
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Internal Server Error: %v", err), http.StatusInternalServerError)
 			return
